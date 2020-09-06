@@ -1,4 +1,4 @@
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HuffNode {
@@ -20,20 +20,20 @@ impl Ord for HuffNode {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HuffTreeNode {
-    data: HuffNode,
-    left: Box<Option<HuffTreeNode>>,
-    right: Box<Option<HuffTreeNode>>,
+    pub data: HuffNode,
+    left: Option<Box<HuffTreeNode>>,
+    right: Option<Box<HuffTreeNode>>,
 }
 
 impl PartialOrd for HuffTreeNode {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.data.partial_cmp(&other.data)
+        self.data.partial_cmp(&other.data).map(|c| c.reverse())
     }
 }
 
 impl Ord for HuffTreeNode {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.data.cmp(&other.data)
+        self.data.cmp(&other.data).reverse()
     }
 }
 
@@ -41,40 +41,35 @@ impl HuffTreeNode {
     pub fn new(data: HuffNode) -> Self {
         HuffTreeNode {
             data,
-            left: Box::new(None),
-            right: Box::new(None),
+            left: None,
+            right: None,
         }
     }
 
     fn new_branch(a: Self, b: Self) -> Self {
-        let mut branch = HuffTreeNode {
+        let branch = HuffTreeNode {
             data: HuffNode {
                 freq: a.data.freq + b.data.freq,
                 symbol: 0,
             },
-            left: Box::new(None),
-            right: Box::new(None),
+            left: Some(Box::new(a)),
+            right: Some(Box::new(b)),
         };
 
-        if a.data > b.data {
-            branch.left = Box::new(Some(a));
-            branch.right = Box::new(Some(b));
-        } else {
-            branch.left = Box::new(Some(b));
-            branch.right = Box::new(Some(a));
-        }
         branch
     }
 }
 
 #[derive(Debug)]
 pub struct HuffTree {
-    head: Option<HuffTreeNode>,
+    head: HuffTreeNode,
 }
 
 impl HuffTree {
     pub fn new() -> Self {
-        HuffTree { head: None }
+        HuffTree {
+            head: HuffTreeNode::new(HuffNode { freq: 0, symbol: 0 }),
+        }
     }
 
     pub fn from_pqueue(bheap: BinaryHeap<HuffNode>) -> Self {
@@ -83,29 +78,68 @@ impl HuffTree {
             .map(|node| HuffTreeNode::new(node))
             .collect();
 
-        let mut tree = Some(pqueue.pop().expect("pqueue was empty"));
-        let mut node = pqueue.pop();
-        while tree != None && node != None {
-            let new_node = HuffTreeNode::new_branch(tree.unwrap(), node.unwrap());
-            node = pqueue.pop();
-            tree = pqueue.pop();
+        while pqueue.len() > 1 {
+            let tree = pqueue.pop().unwrap();
+            let node = pqueue.pop().unwrap();
 
+            let new_node = HuffTreeNode::new_branch(node, tree);
             pqueue.push(new_node);
         }
 
-        HuffTree { head: pqueue.pop() }
+        HuffTree {
+            head: pqueue.pop().expect("the tree needs a root"),
+        }
     }
 
-    // Blank is None value
-    //             ┌────────┬──┐
-    // s: {[np][p][P][c][c][C][C][c][c][ ][ ]}
-    //       └──┼──┘  │  │        │  │
-    //          └─────┼──┘        │  │
-    //                └───────────┴──┘
-    //
-    // a: {[p][c][c][c][c]}
-    //      └──┼──┘  │  │
-    //         └─────┴──┘
-    // b: {[P][C][C]}
-    //      └──┴──┘
+    pub fn pre_traverse<F: Fn(&HuffTreeNode)>(&self, f: F) {
+        HuffTree::pre_traverse_node(&self.head, &f);
+    }
+
+    fn pre_traverse_node<F: Fn(&HuffTreeNode)>(node: &HuffTreeNode, f: &F) {
+        f(node);
+
+        node.left
+            .as_ref()
+            .map(|l| HuffTree::pre_traverse_node(l.as_ref(), f));
+
+        node.right
+            .as_ref()
+            .map(|r| HuffTree::pre_traverse_node(r.as_ref(), f));
+    }
+
+    fn search(node: &HuffTreeNode, symbol: u8, code: String) -> Option<String> {
+        if node.data.symbol != 0 && node.data.symbol == symbol {
+            return Some(code);
+        }
+
+        if node.left.is_some() {
+            let left = node.left.as_ref().unwrap();
+            let code = HuffTree::search(left, symbol, code.clone() + "0");
+            if code.is_some() {
+                return code;
+            }
+        }
+
+        if node.right.is_some() {
+            let right = node.right.as_ref().unwrap();
+            let code = HuffTree::search(right, symbol, code.clone() + "1");
+            if code.is_some() {
+                return code;
+            }
+        }
+
+        return None;
+    }
+
+    pub fn get_code_map(&self) -> HashMap<u8, String> {
+        let mut code_map = HashMap::new();
+        for i in 0u8..255u8 {
+            let code = HuffTree::search(&self.head, i, String::new());
+            if code.is_some() {
+                code_map.insert(i, code.unwrap());
+            }
+        }
+        println!();
+        code_map
+    }
 }

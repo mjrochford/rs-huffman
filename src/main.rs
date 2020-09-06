@@ -1,4 +1,3 @@
-#![feature(binary_heap_drain_sorted)]
 use huffr::huffman_tree::*;
 use std::collections::BinaryHeap;
 use std::fs::File;
@@ -9,7 +8,23 @@ fn main() -> io::Result<()> {
     let pqueue = huff_queue_gen("test.txt")?;
     let tree = HuffTree::from_pqueue(pqueue);
 
-    println!("{:#?}", tree);
+    println!();
+    println!();
+    print!("[");
+    tree.pre_traverse(|node| print!("{}, ", node.data.symbol));
+    println!("]");
+
+    let code_map = tree.get_code_map();
+
+    println!("{:#?}", code_map);
+
+    let file = File::open("test.txt")?;
+    file.bytes()
+        .map(|res| res.expect("error reading file"))
+        .for_each(|b| {
+            print!("{}", code_map.get(&b).expect("wrong input file"));
+        });
+    println!();
     Ok(())
 }
 
