@@ -5,7 +5,8 @@ use std::io;
 use std::io::prelude::*;
 
 fn main() -> io::Result<()> {
-    let pqueue = huff_queue_gen("test.txt")?;
+    let input_file = "mobydick.txt";
+    let pqueue = huff_queue_gen(input_file)?;
     let tree = HuffTree::from_pqueue(pqueue);
 
     println!();
@@ -18,11 +19,11 @@ fn main() -> io::Result<()> {
 
     println!("{:#?}", code_map);
 
-    let file = File::open("test.txt")?;
+    let file = File::open(input_file)?;
     file.bytes()
         .map(|res| res.expect("error reading file"))
         .for_each(|b| {
-            print!("{}", code_map.get(&b).expect("wrong input file"));
+            // print!("{}", code_map.get(&b).expect("wrong input file"));
         });
     println!();
     Ok(())
